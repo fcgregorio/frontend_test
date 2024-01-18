@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Avatar from "boring-avatars";
 import {
   FaRegCircleXmark,
@@ -9,16 +9,61 @@ import {
   FaEnvelope,
 } from "react-icons/fa6";
 
-import Controls from "./controls";
+import Controls, { Option } from "./controls";
 import Modal from "./modal";
 
 import { User } from "./types/user";
 
+const generateUsersListSortFn = (field: string, direction: string): (a: User, b: User) => number => {
+  if (!["company", "email", "name"].includes(field)) {
+    throw new Error(`Unsupported sort field "${field}"`);
+  }
+
+  if (!["ascending", "descending"].includes(direction)) {
+    throw new Error(`Unsupported sort direction "${direction}"`);
+  }
+
+  const sortFn = (userA: User, userB: User) => {
+    let userAField
+    let userBField;
+
+    if (field === "company") {
+      userAField = userA["company"]["name"];
+      userBField = userB["company"]["name"];
+    }
+
+    if (field === "email") {
+      userAField = userA["email"];
+      userBField = userB["email"];
+    }
+
+    if (field === "name") {
+      userAField = userA["name"];
+      userBField = userB["name"];
+    }
+
+    if (direction === "ascending") {
+      return (userAField as string).localeCompare(userBField as string)
+    } 
+    
+    if (direction === "descending") {
+      return -(userAField as string).localeCompare(userBField as string)
+    }
+
+    throw new Error();
+  }
+
+  return sortFn;
+}
+
 export type GalleryProps = {
   users: User[];
 };
+
 const Gallery = ({ users }: GalleryProps) => {
   const [usersList, setUsersList] = useState(users);
+  const [controlField, setControlField] = useState<Option | null>(null);
+  const [controlDirection, setControlDirection] = useState<Option | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -36,17 +81,32 @@ const Gallery = ({ users }: GalleryProps) => {
     setIsModalOpen(false);
   };
 
+  useEffect(() => {
+    if (!!controlField && !!controlDirection) {
+      setUsersList((prevValue) => {
+        const newValue = structuredClone(prevValue);
+        newValue.sort(generateUsersListSortFn(controlField.value, controlDirection.value));
+        return newValue;
+      })
+    }
+  }, [controlField, controlDirection])
+
   return (
     <div className="user-gallery">
       <div className="heading">
         <h1 className="title">Users</h1>
-        <Controls />
+        <Controls
+          field={controlField}
+          setField={setControlField}
+          direction={controlDirection}
+          setDirection={setControlDirection}
+        />
       </div>
       <div className="items">
-        {usersList.map((user, index) => (
+        {usersList.map((user) => (
           <div
             className="item user-card"
-            key={index}
+            key={user.id}
             onClick={() => handleModalOpen(user.id)}
           >
             <div className="body">
